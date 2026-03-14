@@ -1,44 +1,28 @@
 import discord
-from discord.ext import commands
-import requests
 import os
+import google.generativeai as genai
+from discord.ext import commands
 
+# Environment variables
 TOKEN = os.getenv("TOKEN")
-AI_KEY = os.getenv("AI_KEY")
+GEMINI_KEY = os.getenv("GEMINI_KEY")
 
+# Configure Gemini
+genai.configure(api_key=GEMINI_KEY)
+
+# AI model
+model = genai.GenerativeModel("gemini-2.5-flash")
+
+# Discord bot setup
 intents = discord.Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-def ask_ai(question):
-
-    data = {
-        "model": "mistralai/mistral-7b-instruct",
-        "messages": [
-            {"role": "user", "content": question}
-        ]
-    }
-
-    headers = {
-        "Authorization": f"Bearer {AI_KEY}"
-    }
-
-    r = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        json=data,
-        headers=headers
-    )
-
-    if r.status_code == 200:
-        return r.json()["choices"][0]["message"]["content"]
-
-    return "I cannot answer right now."
-
 
 @bot.event
 async def on_ready():
-    print("Bot is online")
+    print(f"Bot is online as {bot.user}")
 
 
 @bot.event
@@ -47,14 +31,19 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    question = message.content
+    user_message = message.content
 
-    answer = ask_ai(question)
+    try:
+        response = model.generate_content(user_message)
+        reply = response.text
+    except Exception as e:
+        print(e)
+        reply = "AI cannot respond right now."
 
-    if len(answer) > 1900:
-        answer = answer[:1900]
+    if len(reply) > 1900:
+        reply = reply[:1900]
 
-    await message.channel.send(answer)
+    await message.channel.send(reply)
 
 
 bot.run(TOKEN)
